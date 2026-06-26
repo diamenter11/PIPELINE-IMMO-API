@@ -95,9 +95,11 @@ jobs:
             cd ~/pipeline-immo-app
             git pull origin main
             source venv/bin/activate
-            pip install -r requirements.txt --quiet
+            pip install --upgrade pip --quiet
+            pip install fastapi uvicorn psycopg2-binary sqlalchemy python-dotenv streamlit plotly pandas requests --quiet
             pkill -f uvicorn || true
             pkill -f streamlit || true
+            sleep 2
             nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
             nohup streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0 &
             echo "Deploiement termine avec succes"
