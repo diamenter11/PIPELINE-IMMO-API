@@ -1,0 +1,103 @@
+name: Pipeline CI/CD — Pipeline Immobilière
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ─────────────────────────────────────────────
+  # JOB 1 — Tests automatiques
+  # ─────────────────────────────────────────────
+  tests:
+    name: Tests automatiques
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installation des dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest fastapi sqlalchemy python-dotenv
+
+      - name: Execution des tests unitaires
+        run: |
+          pytest test_api_ci.py -v --tb=short
+        env:
+          RDS_HOST: localhost
+          RDS_PORT: 5432
+          RDS_DATABASE: test
+          RDS_USER: test
+          RDS_PASSWORD: test
+          API_KEY: test-key
+
+  # ─────────────────────────────────────────────
+  # JOB 2 — Build Docker
+  # ─────────────────────────────────────────────
+  build:
+    name: Build image Docker
+    runs-on: ubuntu-latest
+    needs: tests
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Build image Docker
+        run: |
+          docker build -t pipeline-immo-api:latest .
+          docker images pipeline-immo-api
+
+      - name: Test du container Docker
+        run: |
+          docker run -d \
+            --name test-container \
+            -p 8000:8000 \
+            -e RDS_HOST=localhost \
+            -e RDS_PORT=5432 \
+            -e RDS_DATABASE=test \
+            -e RDS_USER=test \
+            -e RDS_PASSWORD=test \
+            -e API_KEY=test-key \
+            pipeline-immo-api:latest
+          sleep 5
+          docker ps | grep test-container
+          docker stop test-container
+
+  # ─────────────────────────────────────────────
+  # JOB 3 — Déploiement sur EC2 (uniquement sur push main)
+  # ─────────────────────────────────────────────
+  deploy:
+    name: Deploiement EC2
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Deploiement sur EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/pipeline-immo-app
+            git pull origin main
+            source venv/bin/activate
+            pip install -r requirements.txt --quiet
+            pkill -f uvicorn || true
+            pkill -f streamlit || true
+            nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
+            nohup streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0 &
+            echo "Deploiement termine avec succes"
