@@ -75,31 +75,18 @@ jobs:
   # ─────────────────────────────────────────────
   # JOB 3 — Déploiement sur EC2 (uniquement sur push main)
   # ─────────────────────────────────────────────
-  deploy:
-    name: Deploiement EC2
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
-
-      - name: Deploiement sur EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
+  script: |
             cd ~/pipeline-immo-app
             git pull origin main
             source venv/bin/activate
-            pip install --upgrade pip --quiet
             pip install fastapi uvicorn psycopg2-binary sqlalchemy python-dotenv streamlit plotly pandas requests --quiet
             pkill -f uvicorn || true
             pkill -f streamlit || true
             sleep 2
-            nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
-            nohup streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0 &
+            nohup uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+            disown
+            nohup streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0 > /tmp/streamlit.log 2>&1 &
+            disown
+            sleep 3
             echo "Deploiement termine avec succes"
+            ps aux | grep -E "uvicorn|streamlit" | grep -v grep
