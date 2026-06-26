@@ -71,8 +71,8 @@ jobs:
             pkill -f uvicorn || true
             pkill -f streamlit || true
             sleep 2
-            nohup uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 & disown
-            nohup streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0 > /tmp/streamlit.log 2>&1 & disown
-            sleep 3
+            setsid uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+            setsid streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0 > /tmp/streamlit.log 2>&1 &
+            sleep 5
             echo "Deploiement termine"
             ps aux | grep -E "uvicorn|streamlit" | grep -v grep
