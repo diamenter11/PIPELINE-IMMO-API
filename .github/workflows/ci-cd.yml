@@ -68,11 +68,9 @@ jobs:
             cd ~/pipeline-immo-app && git pull origin main
             source venv/bin/activate
             pip install fastapi uvicorn psycopg2-binary sqlalchemy python-dotenv streamlit plotly pandas requests --quiet
-            pkill -f uvicorn || true
-            pkill -f streamlit || true
-            sleep 2
-            setsid uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
-            setsid streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0 > /tmp/streamlit.log 2>&1 &
-            sleep 5
-            echo "Deploiement termine"
-            ps aux | grep -E "uvicorn|streamlit" | grep -v grep
+            sudo systemctl restart fastapi
+            sudo systemctl restart streamlit
+            sleep 3
+            sudo systemctl status fastapi --no-pager
+            sudo systemctl status streamlit --no-pager
+            echo "Deploiement termine avec succes"
